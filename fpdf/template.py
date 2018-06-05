@@ -2,8 +2,6 @@
 
 "PDF Template Helper for FPDF.py"
 
-from __future__ import with_statement
-
 __author__ = "Mariano Reingart <reingart@gmail.com>"
 __copyright__ = "Copyright (C) 2010 Mariano Reingart"
 __license__ = "LGPL 3.0"
@@ -47,20 +45,19 @@ class Template:
             f = open(infile, 'rb')
         else:
             f = open(infile)
-        with f:
-            for row in csv.reader(f, delimiter=delimiter):
-                kargs = {}
-                for i,v in enumerate(row):
-                    if not v.startswith("'") and decimal_sep!=".": 
-                        v = v.replace(decimal_sep,".")
-                    else:
-                        v = v
-                    if v=='':
-                        v = None
-                    else:
-                        v = eval(v.strip())
-                    kargs[keys[i]] = v
-                self.elements.append(kargs)
+        for row in csv.reader(f, delimiter=delimiter):
+            kargs = {}
+            for i,v in enumerate(row):
+                if not v.startswith("'") and decimal_sep!=".": 
+                    v = v.replace(decimal_sep,".")
+                else:
+                    v = v
+                if v=='':
+                    v = None
+                else:
+                    v = eval(v.strip())
+                kargs[keys[i]] = v
+            self.elements.append(kargs)
         self.keys = [v['name'].lower() for v in self.elements]
 
     def add_page(self):
@@ -83,9 +80,6 @@ class Template:
     def has_key(self, name):
         return name.lower() in self.keys
         
-    def __contains__(self, name):
-        return self.has_key(name)
-
     def __getitem__(self, name):
         if name in self.keys:
             key = name.lower()
@@ -138,46 +132,47 @@ class Template:
         if dest:
             return pdf.output(outfile, dest)
         
-    def text(self, pdf, x1=0, y1=0, x2=0, y2=0, text='', font="arial", size=10, 
+    def text(self, pdf, x1=0, y1=0, x2=0, y2=0, text='', font="arial", size=10,
              bold=False, italic=False, underline=False, align="", 
-             foreground=0, background=65535, multiline=None,
+             foreground=0, background=65535, text_color=0,multiline=None, border=1, fill=True,
              *args, **kwargs):
-        if text:
-            if pdf.text_color!=rgb(foreground):
-                pdf.set_text_color(*rgb(foreground))
-            if pdf.fill_color!=rgb(background):
-                pdf.set_fill_color(*rgb(background))
+        if pdf.draw_color != rgb(foreground):
+            pdf.set_draw_color(*rgb(foreground))
+        if pdf.text_color!=rgb(text_color):
+            pdf.set_text_color(*rgb(text_color))
+        if pdf.fill_color!=rgb(background):
+            pdf.set_fill_color(*rgb(background))
 
-            font = font.strip().lower()
-            if font == 'arial black':
-                font = 'arial'
-            style = ""
-            for tag in 'B', 'I', 'U':
-                if (text.startswith("<%s>" % tag) and text.endswith("</%s>" %tag)):
-                    text = text[3:-4]
-                    style += tag
-            if bold: style += "B"
-            if italic: style += "I"
-            if underline: style += "U"
-            align = {'L':'L','R':'R','I':'L','D':'R','C':'C','':''}.get(align) # D/I in spanish
-            pdf.set_font(font,style,size)
-            ##m_k = 72 / 2.54
-            ##h = (size/m_k)
-            pdf.set_xy(x1,y1)
-            if multiline is None:
-                # multiline==None: write without wrapping/trimming (default)
-                pdf.cell(w=x2-x1,h=y2-y1,txt=text,border=0,ln=0,align=align)
-            elif multiline:
-                # multiline==True: automatic word - warp
-                pdf.multi_cell(w=x2-x1,h=y2-y1,txt=text,border=0,align=align)
-            else:
-                # multiline==False: trim to fit exactly the space defined
-                text = pdf.multi_cell(w=x2-x1, h=y2-y1,
-                             txt=text, align=align, split_only=True)[0]
-                print("trimming: *%s*" % text)
-                pdf.cell(w=x2-x1,h=y2-y1,txt=text,border=0,ln=0,align=align)
+        font = font.strip().lower()
+        if font == 'arial black':
+            font = 'arial'
+        style = ""
+        for tag in 'B', 'I', 'U':
+            if (text.startswith("<%s>" % tag) and text.endswith("</%s>" %tag)):
+                text = text[3:-4]
+                style += tag
+        if bold: style += "B"
+        if italic: style += "I"
+        if underline: style += "U"
+        align = {'L':'L','R':'R','I':'L','D':'R','C':'C','':''}.get(align) # D/I in spanish
+        pdf.set_font(font,style,size)
+        ##m_k = 72 / 2.54
+        ##h = (size/m_k)
+        pdf.set_xy(x1,y1)
+        if multiline is None:
+            # multiline==None: write without wrapping/trimming (default)
+            pdf.cell(w=x2-x1,h=y2-y1,txt=text,border=border, fill=fill,ln=0,align=align)
+        elif multiline:
+            # multiline==True: automatic word - warp
+            pdf.multi_cell(w=x2-x1,h=y2-y1,txt=text,border=border, fill=fill,align=align)
+        else:
+            # multiline==False: trim to fit exactly the space defined
+            text = pdf.multi_cell(w=x2-x1, h=y2-y1,
+                         txt=text, align=align, split_only=True)[0]
+            print("trimming: *%s*" % text)
+            pdf.cell(w=x2-x1,h=y2-y1,txt=text,border=border,fill=fill,ln=0,align=align)
 
-            #pdf.Text(x=x1,y=y1,txt=text)
+        #pdf.Text(x=x1,y=y1,txt=text)
 
     def line(self, pdf, x1=0, y1=0, x2=0, y2=0, size=0, foreground=0, *args, **kwargs):
         if pdf.draw_color!=rgb(foreground):
@@ -193,7 +188,8 @@ class Template:
         if pdf.fill_color!=rgb(background):
             pdf.set_fill_color(*rgb(background))
         pdf.set_line_width(size)
-        pdf.rect(x1, y1, x2-x1, y2-y1, style='FD')
+        pdf.rect(x1, y1, x2 - x1, y2 - y1, style='FD')
+
 
     def image(self, pdf, x1=0, y1=0, x2=0, y2=0, text='', *args,**kwargs):
         if text:

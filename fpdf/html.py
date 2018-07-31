@@ -108,10 +108,10 @@ class HTML2FPDF(HTMLParser):
                     self.output_table_header()
                 self.box_shadow(w, h, bgcolor)
                 if DEBUG: print("td cell", self.pdf.x, w, txt, "*")
-                dry_run_cells = self.pdf.multi_cell(w,h,txt,border,0,align,split_only=True,max_lines=max_lines)
+                dry_run_cells = self.pdf.multi_cell(w,h,txt,border,align,split_only=True,max_lines=max_lines)
                 num_lines_needed = len(dry_run_cells)
                 start_y = self.pdf.get_y()
-                self.pdf.multi_cell(w,h,txt,border,0,align,in_table=True,max_lines=max_lines)
+                self.pdf.multi_cell(w,h,txt,border,align,in_table=True,max_lines=max_lines)
                 if num_lines_needed > 1:
                     self.pdf.set_xy(self.pdf.get_x(), start_y)
                 cell_h = num_lines_needed*h if num_lines_needed <= max_lines else max_lines*h

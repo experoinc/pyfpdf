@@ -10,6 +10,7 @@ __license__ = "LGPL 3.0"
 
 from .fpdf import FPDF
 from .py3k import PY3K, basestring, unicode, HTMLParser
+import sys
 
 DEBUG = False
 
@@ -55,6 +56,7 @@ class HTML2FPDF(HTMLParser):
         self.tfoot = None
         self.theader_out = self.tfooter_out = False
         self.hsize = dict(h1=2, h2=1.5, h3=1.17, h4=1, h5=0.83, h6=0.67)
+        self.table_h_max = 0
         
     def width2mm(self, length):
         if length[-1]=='%':
@@ -78,9 +80,8 @@ class HTML2FPDF(HTMLParser):
                 l = self.table_col_width[i:i+colspan]
             else:
                 l = [self.td.get('width','240')]
-            w = sum([self.width2mm(length) for length in l])
-            h = int(self.td.get('height', 0)) // 4 or self.h*1.30
-            self.table_h = h
+            w = sum([self.width2mm(lenght) for lenght in l])
+            h = int(self.td.get('height', 0)) / 4 or self.h*1.30
             border = int(self.table.get('border', 0))
             if not self.th:
                 align = self.td.get('align', 'L')[0].upper()
@@ -96,23 +97,33 @@ class HTML2FPDF(HTMLParser):
             if self.tfoot is not None:
                 self.tfooter.append(((w,h,txt,border,0,align), bgcolor))
             # check if reached end of page, add table footer and header:
-            height = h + (self.tfooter and self.tfooter[0][0][1] or 0)
+            max_lines = 2
+            height = max_lines*h + (self.tfooter and self.tfooter[0][0][1] or 0)
             if self.pdf.y+height>self.pdf.page_break_trigger and not self.th:
                 self.output_table_footer()
-                self.pdf.add_page(same = True)
+                self.pdf.add_page()
                 self.theader_out = self.tfooter_out = False
             if self.tfoot is None and self.thead is None:
                 if not self.theader_out: 
                     self.output_table_header()
                 self.box_shadow(w, h, bgcolor)
                 if DEBUG: print("td cell", self.pdf.x, w, txt, "*")
-                self.pdf.cell(w,h,txt,border,0,align)
+                dry_run_cells = self.pdf.multi_cell(w,h,txt,border,0,align,split_only=True,max_lines=max_lines)
+                num_lines_needed = len(dry_run_cells)
+                start_y = self.pdf.get_y()
+                self.pdf.multi_cell(w,h,txt,border,0,align,in_table=True,max_lines=max_lines)
+                if num_lines_needed > 1:
+                    self.pdf.set_xy(self.pdf.get_x(), start_y)
+                cell_h = num_lines_needed*h if num_lines_needed <= max_lines else max_lines*h
+                self.table_h_max = cell_h if cell_h > self.table_h_max else self.table_h_max
+                self.table_h = self.table_h_max
+
         elif self.table is not None:
             # ignore anything else than td inside a table 
             pass
         elif self.align:
             if DEBUG: print("cell", txt, "*")
-            self.pdf.cell(0,self.h,txt,0,1,self.align[0].upper(), self.href)
+            self.pdf.cell(0,self.h,txt,0,1,self.align[0].upper(), self.href,in_table=True)
         else:
             txt = txt.replace("\n"," ")
             if self.href:
@@ -216,7 +227,7 @@ class HTML2FPDF(HTMLParser):
             # save previous font state:
             self.font_stack.append((self.font_face, self.font_size, self.color))
             if 'color' in attrs:
-                color = hex2dec(attrs['color'])
+                self.color = hex2dec(attrs['color'])
                 self.set_text_color(*color)
                 self.color = color
             if 'face' in attrs:
@@ -323,6 +334,7 @@ class HTML2FPDF(HTMLParser):
             self.pdf.set_x(self.table_offset)
             self.output_table_sep()
         if tag=='tr':
+            self.table_h_max = 0
             h = self.table_h
             if self.tfoot is None:
                 self.pdf.ln(h)
